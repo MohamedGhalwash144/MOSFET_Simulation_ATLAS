@@ -1,0 +1,177 @@
+go atlas simflags = "-P 8"
+
+set tox = 0.016
+set tpoly = 0.2 
+set P = 3e15
+set Pplus = 3e16
+set Xj = 0.23
+set qss  =1e11          
+
+ 
+#Mesh
+
+mesh width = 1.0
+
+x.mesh loc = 0   spacing = 0.1
+x.mesh loc = 2   spacing = 0.1
+x.mesh loc = 2.13   spacing = 0.1
+
+x.mesh loc = 3.26   spacing = 0.1
+x.mesh loc = 3.13   spacing = 0.1
+
+x.mesh loc = 5.26   spacing = 0.1
+
+y.mesh loc= -$"tpoly"-$"tox" spacing=0.1
+y.mesh loc=0                 spacing=0.001
+y.mesh loc=0.10              spacing=0.01
+y.mesh loc=1               spacing=0.1
+ 
+
+#Regions
+region num = 1 NAME=Oxide material =oxide  y.min = -$"tox"-$"tpoly" y.max = 0 
+region num = 2 NAME=Sub material = silicon    y.min = 0 y.max = 1
+
+
+#ELECTRODES
+
+#Source
+electrode NAME=source x.min=0 x.max=1.5 y.min=-0.2 y.max=0
+
+#Drain
+electrode NAME=drain x.min=3.76 x.max= 5.26 y.min=-0.2 y.max=0
+
+#Gate
+electrode NAME =gate x.min=2 x.max=3.26 y.min = -$"tpoly"-$"tox" y.max = -$tox
+
+#Back 
+
+electrode NAME =Body bottom
+
+
+
+#Doping
+
+doping uniform p.type conce = $"P" region = 2 
+
+doping uniform p.type conce = $"Pplus" y.min = 0 y.max = $"Xj"
+
+doping uniform n.type conce = 1e20 region = 2 x.min = 0 x.max = 2.03 y.min = 0 y.max = $"Xj"
+
+doping uniform n.type conce = 1e20 region = 2 x.min = 3.24 x.max = 5.26 y.min = 0 y.max = $"Xj"
+
+
+contact  name= gate	n.poly
+contact  name= Drain	ALUMINUM
+contact  name= Source	ALUMINUM
+interface qf= $"qss"	x.min=1 x.max=3 	y.min=-0.005	y.max=0.005
+
+material silicon EG300=1.14 PERMITTIVITY=11.7
+
+save outf = MOSCAP_1micro.str
+
+#Modles
+
+models
+
+MODEL MOS2 CVT PRINT
+
+output	CON.BAND VAL.BAND U.SRH QFN QFP band.param E.MOBILITY E.VELOCITY
+
+
+
+method newton
+
+save outf = 00_MOSFET.str
+
+
+solve init
+
+save outf = 01_MOSCAP_Thermal_equi.str
+
+tonyplot 01_MOSCAP_Thermal_equi.str 
+
+
+#### ID Vs Vgs
+solve vdrain = 0 vstep= 0.1 vfinal = 2 name = drain
+log outf = 01_Mos_Id_Vgs.log
+solve vgate =-0.1 vstep=0.1 vfinal = 3  name = gate
+log Off
+####
+
+###V_th extracttion
+#extract init infile="01_Mos_Id_Vgs.log"
+#extract name="Vth_Sat" (xintercept(maxslope(curve(v."gate", i."drain"))))
+
+
+#### C-V Charactristics low
+
+
+load infile = 01_MOSCAP_Thermal_equi.str MASTER
+
+solve vgate =0 vstep=-0.1 vfinal =-3 name = gate
+
+log outf= C_V_chractristics_low.log
+solve vgate=-3 vstep=0.1 vfinal=3 name=gate qscv
+log off
+
+####
+
+#### C-V Charactristics high
+
+
+load infile = 01_MOSCAP_Thermal_equi.str MASTER
+
+solve vgate =0 vstep=-0.1 vfinal =-3 name = gate
+
+log outf= C_V_chractristics_high.log
+solve vgate=-3 vstep=0.1 vfinal=3 name=gate ac freq=1e6 aname=gate
+log off
+
+tonyplot -overlay C_V_chractristics_high.log C_V_chractristics_low.log
+
+
+
+
+######Id_Vds at diff Vgs
+
+load infile = 01_MOSCAP_Thermal_equi.str MASTER
+
+
+solve vgate =0 vstep=0.1 vfinal = 1.5 name = gate
+log outf = 02_Mos_Id_Vds_1.log
+solve vdrain =0 vstep=0.1 vfinal = 3 name = drain
+log off
+
+load infile = 01_MOSCAP_Thermal_equi.str MASTER
+
+solve vgate =0 vstep=0.1 vfinal = 2 name = gate
+log outf = 02_Mos_Id_Vds_2.log
+solve vdrain =0 vstep=0.1 vfinal = 3 name = drain
+log off
+
+load infile = 01_MOSCAP_Thermal_equi.str MASTER
+
+
+solve vgate =0 vstep=0.1 vfinal = 2.5 name = gate
+log outf = 02_Mos_Id_Vds_3.log
+solve vdrain =0 vstep=0.1 vfinal = 3 name = drain
+log off
+
+load infile = 01_MOSCAP_Thermal_equi.str MASTER
+
+
+solve vgate =0 vstep=0.1 vfinal = 3 name = gate
+log outf = 02_Mos_Id_Vds_4.log
+solve vdrain =0 vstep=0.1 vfinal = 3 name = drain
+log off
+
+load infile = 01_MOSCAP_Thermal_equi.str MASTER
+
+tonyplot -overlay 02_Mos_Id_Vds_1.log 02_Mos_Id_Vds_2.log 02_Mos_Id_Vds_3.log 02_Mos_Id_Vds_4.log
+
+
+quit
+
+
+
+
